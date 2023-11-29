@@ -19,7 +19,8 @@ def find_the_thai():
         if result == choosenThai:
             profit = placedBet * 5
         else:
-            profit = 0
+            profit = -1* placedBet
+
         return render_template("find_the_thai.html",numbers_of_thais=numbers_of_thais, profit=profit,choosenThai=choosenThai,placedBet=placedBet,result=result)
     else:
         return render_template("find_the_thai.html",numbers_of_thais=numbers_of_thais)

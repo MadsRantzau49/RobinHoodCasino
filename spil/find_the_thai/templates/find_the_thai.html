@@ -12,12 +12,18 @@ h1{
 width:10%;
 }
 
-img{
-width:15%;
-align:center;
+button{
+background:url(https://static.vecteezy.com/system/resources/previews/033/252/038/original/thailand-farmer-confused-with-question-mark-vector.jpg);background-size: 100%;
+  width: 15%;
+  height: 40%;
+  border: 1px solid;
 }
-a img:hover{
-border: 2px SOLID BLACK;
+button:hover{
+border: 2px SOLID RED;
+}
+
+body{
+background-image: url('images/thai_question.jpg');
 }
 </style>
 <h1>Find The Thai</h1>
@@ -25,9 +31,10 @@ border: 2px SOLID BLACK;
 <form action="/find_the_thai.html" method="post">
 
 <div>
-	<input type="text" id="placedBet" placeholder="Place Your Bet" name="placedBet">
+	<input type="number" id="placedBet" value=10 name="placedBet">
 	{% for i in range(numbers_of_thais) %}
-	<input type="submit" name="choosenThai" value="{{i}}" class="images"<a> <img src="https://static.vecteezy.com/system/resources/previews/033/252/038/original/thailand-farmer-confused-with-question-mark-vector.jpg" alt="?"></a>
+	<button type="submit" name="choosenThai" value={{i}} class="images" >	</button>
+
 	{% endfor %}
 </div>
 
