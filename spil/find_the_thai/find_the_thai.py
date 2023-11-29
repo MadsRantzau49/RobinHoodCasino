@@ -6,9 +6,23 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
+    return render_template("index.html")
+
+@app.route('/find_the_thai.html', methods=['POST','GET'])
+def find_the_thai():
+    numbers_of_thais = 5
     
-    return render_template("index.html", len_list=len_list, player=dbu_players_list, economy_list=economy_list)
-  
+    if request.method == 'POST':
+        placedBet = int(request.form['placedBet'])
+        choosenThai = int(request.form['choosenThai'])
+        result = random.randint(0,5)
+        if result == choosenThai:
+            profit = placedBet * 5
+        else:
+            profit = 0
+        return render_template("find_the_thai.html",numbers_of_thais=numbers_of_thais, profit=profit,choosenThai=choosenThai,placedBet=placedBet,result=result)
+    else:
+        return render_template("find_the_thai.html",numbers_of_thais=numbers_of_thais)
 
 
 if __name__ == '__main__':

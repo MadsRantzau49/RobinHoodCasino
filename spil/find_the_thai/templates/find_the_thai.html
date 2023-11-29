@@ -1,0 +1,41 @@
+<html>
+<head>
+<title> Find The Thai </title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--<meta http-equiv="refresh" content="2;url=http://192.168.0.100:5001/find_the_thai.html"></head>--!>
+<body>
+<style>
+h1{
+    text-align: center;
+}
+#placedBet{
+width:10%;
+}
+
+img{
+width:15%;
+align:center;
+}
+a img:hover{
+border: 2px SOLID BLACK;
+}
+</style>
+<h1>Find The Thai</h1>
+
+<form action="/find_the_thai.html" method="post">
+
+<div>
+	<input type="text" id="placedBet" placeholder="Place Your Bet" name="placedBet">
+	{% for i in range(numbers_of_thais) %}
+	<input type="submit" name="choosenThai" value="{{i}}" class="images"<a> <img src="https://static.vecteezy.com/system/resources/previews/033/252/038/original/thailand-farmer-confused-with-question-mark-vector.jpg" alt="?"></a>
+	{% endfor %}
+</div>
+
+</form>
+<p>choosenThai: {{choosenThai}}<p>
+<p>placedBet: {{placedBet}}<p>
+<p>Profit: {{profit}}<p>
+<p>result: {{result}}<p>
+
+</body>
+</html>
