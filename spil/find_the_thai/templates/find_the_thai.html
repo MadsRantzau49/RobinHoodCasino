@@ -12,19 +12,25 @@ h1{
 width:10%;
 }
 
-button{
-background:url(https://static.vecteezy.com/system/resources/previews/033/252/038/original/thailand-farmer-confused-with-question-mark-vector.jpg);background-size: 100%;
-  width: 15%;
-  height: 40%;
-  border: 1px solid;
-}
 button:hover{
 border: 2px SOLID RED;
 }
+{% for image in random_img %}
+.image-{{loop.index0}} {
+{% if first_time == 0 and result == loop.index0 %}
+background: url('{{ url_for("static", filename="1" ~ image) }}');
+    {% else %}
+      background: url('{{ url_for("static", filename=image) }}');
+    {% endif %}
+  background-size: 100%;
+  background-repeat:no-repeat;
+  width: 15%;
+  height: 16rem;
+  border: 1px solid;
+}	
+{% endfor %}
 
-body{
-background-image: url('images/thai_question.jpg');
-}
+
 </style>
 <h1>Find The Thai</h1>
 
@@ -32,8 +38,9 @@ background-image: url('images/thai_question.jpg');
 
 <div>
 	<input type="number" id="placedBet" value=10 name="placedBet">
+	<input type="hidden" id="custId" name="resendImages" value="{{random_img}}">
 	{% for i in range(numbers_of_thais) %}
-	<button type="submit" name="choosenThai" value={{i}} class="images" >	</button>
+	<button type="submit" name="choosenThai" value={{i}} class="image-{{i}}" >	</button>
 
 	{% endfor %}
 </div>
@@ -43,6 +50,7 @@ background-image: url('images/thai_question.jpg');
 <p>placedBet: {{placedBet}}<p>
 <p>Profit: {{profit}}<p>
 <p>result: {{result}}<p>
-
+<p> first_time: {{first_time}} </p>
+<p>sameImages: {{random_img}}</p>
 </body>
 </html>
