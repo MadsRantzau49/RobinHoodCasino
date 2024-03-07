@@ -9,3 +9,6 @@ Spil ideer:
 -Bloons tower defense.
 -Stop tiden (timer på 5 sekunder ram 5.00 for at vinde (evt mindre præmie ved 5.01 osv)
 -Pis i kummen
+-Straffespark (med forskellige målmænds sværhedsgrad), evt mulighed for trickshots
+-Cookie clicker hvor hvis den bliver rød så taber man alle pengene. 
+-Scor damer spillet, det gælder om at drikke nok øl til at tør snakke med dem men uden at være retard. 
