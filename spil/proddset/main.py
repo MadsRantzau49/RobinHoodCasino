@@ -3,6 +3,7 @@ import json
 
 
 def getOddsetData():
+    # https://api.the-odds-api.com/v4/sports/soccer_uefa_european_championship/odds/?apiKey=d24d8748a9826bebfa5b0a63c6362d76&regions=eu&markets=h2h,spreads
     with open('data.json', 'r') as f:
         data = json.load(f)
     return data
