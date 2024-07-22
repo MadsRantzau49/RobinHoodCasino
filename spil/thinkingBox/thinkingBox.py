@@ -2,41 +2,57 @@ import random
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 
-startDiceAmount = 2
-playersAmount = 3
+startDiceAmount = 4
+playersAmount = 2
 playersList = []
 lastPlayer = None
 guessAmount = None
 guessValue = None
+decision = None
+frames = []
+
+playerTurnLabel = None
+diceResult = None
+lastGuessLabel = None
+
+# ----------------------------------------------------------------------------------------------------Setup
+
 class PlayerInformation:
     def __init__(self, id, diceAmount, diceRoll):
         self.id = id
         self.diceAmount = diceAmount 
         self.diceRoll = diceRoll
 
-def rollDices(d):
-    return [random.randint(1,6) for _ in range(d)]
-
 def startGame():
     global playersList
     playersList = [PlayerInformation(i, startDiceAmount, None) for i in range(playersAmount)]
+    generate_guess_layout()
+    checkGuessLayout()
     newRound(None)
 
-def find_guess():
-    def submit_guess():
-        root.quit()  # Ends the Tkinter main loop
+def toggle_frame():
+    global frames
+    for frame in frames:
+        if frame.winfo_ismapped():
+            frame.pack_forget()
+        else:
+            frame.pack()
 
-
-    guessAmount = tk.IntVar()  # Define guessAmount as an IntVar
-    guessValue = tk.StringVar()  # Define guessValue as an IntVar
-
+def generate_guess_layout():
+    global guessAmount, guessValue
+    global frames
+    guessAmount = tk.IntVar(value=1)  # Define guessAmount as an IntVar
+    guessValue = tk.StringVar(value=1)  # Define guessValue as a StringVar
+    
+    tk.Button(root, text="Submit", command=lambda: (root.quit(), toggle_frame())).pack(pady=10)
+    
     # Frame for the first group of radio buttons
     frame1 = tk.Frame(root)
     frame1.pack(pady=(10, 0))  # Add padding on top and no padding at bottom
 
     # Create and pack radio buttons for guessAmount
     amountOfDices = sum(p.diceAmount + 1 for p in playersList)
-    for i in range(1,amountOfDices + 1):
+    for i in range(1, amountOfDices + 1):
         tk.Radiobutton(frame1, text=i, variable=guessAmount, value=i).pack(side=tk.LEFT, padx=5, pady=5)
 
     # Add an empty frame to create space
@@ -48,47 +64,58 @@ def find_guess():
     frame2.pack()
 
     # Create and pack radio buttons for guessValue
-    for i in range(1, ):
+    for i in range(1, 7):
         tk.Radiobutton(frame2, text=i, variable=guessValue, value=i).pack(side=tk.LEFT, padx=10, pady=10)
 
     # Additional radio button for guessValue
     tk.Radiobutton(frame2, text="kind", variable=guessValue, value="k").pack(side=tk.LEFT, padx=10, pady=10)
-
-    # Submit button
-    submit_button = tk.Button(root, text="Submit", command=submit_guess)
-    submit_button.pack(pady=10)
-
-    root.mainloop()  # Start the mainloop to wait for user input
-
-    selected_amount = guessAmount.get()
-    selected_value = guessValue.get()
-    print(selected_amount, selected_value)
-    return selected_amount, selected_value  # Return the selected values
-
-def checkGuess():
-    def submit_guess():
-        root.quit()  # Ends the Tkinter main loop
-
+    frames.extend((frame1,frame2))
+    
+def checkGuessLayout():
+    global decision
     decision = tk.BooleanVar()
 
     frame3 = tk.Frame(root)
     frame3.pack(pady=(10, 0))
+    frames.append(frame3)
+    frame3.pack_forget()
+
     tk.Radiobutton(frame3, text="Open", variable=decision, value=False).pack(side=tk.LEFT, padx=10, pady=10)
     tk.Radiobutton(frame3, text="Roll", variable=decision, value=True).pack(side=tk.LEFT, padx=10, pady=10)
     
-    tk.Button(frame3, text="Submit", command=submit_guess).pack(pady=10)
+# ----------------------------------------------------------------------------------------------------Input
 
+def find_guess():
+    global guessAmount, guessValue
+    root.mainloop()  # Start the mainloop to wait for user input
+
+    selected_amount = guessAmount.get()
+    selected_value = guessValue.get()
+
+    return selected_amount, selected_value  # Return the selected values
+
+
+
+def checkGuess():
     root.mainloop()
     selectedDecision = decision.get()
     
-    print(selectedDecision,"DECISION!!!")
     return selectedDecision
 
+# ----------------------------------------------------------------------------------------------------Rounds
+
+
+def rollDices(d):
+    return [random.randint(1,6) for _ in range(d)]
+
+
 def newRound(loosingPlayer):
+    print(loosingPlayer)
     for p in playersList:
-        if loosingPlayer and loosingPlayer != p.id:
+        if (loosingPlayer or loosingPlayer == 0) and loosingPlayer != p.id:
             p.diceAmount -= 1
         if p.diceAmount < 1:
+            print(p.id," ER DØD")
             continue
         diceRoll = rollDices(p.diceAmount)
         p.diceRoll = diceRoll
@@ -105,7 +132,32 @@ def nextPlayer(player):
     for p in playersList:
         if p.diceAmount > 0 and p.id != player:
             return p.id
+    print("HVAD FANDEN FOREGÅR DER")
     exit()
+
+def playRound(player, lastGuess, lastPlayer):
+    # Helping function
+    displayPlayers(player, lastGuess)
+
+    nextPlayerId = nextPlayer(player)
+
+    if not lastGuess:
+        playerGuess = find_guess()
+        playRound(nextPlayerId, playerGuess, player)
+    elif checkGuess():
+        playerGuess = find_guess()
+        if validGuess(playerGuess, lastGuess):
+            playRound(nextPlayerId, playerGuess, player)
+        else:
+            print("Invalid guess!")
+            exit()
+    else:
+        if guessIsTrue(lastGuess):
+            newRound(player)
+        else:
+            newRound(lastPlayer)
+
+# ----------------------------------------------------------------------------------------------------Validering
 
 def validGuess(guess, lastGuess):
     if guess[0] < lastGuess[0]:
@@ -138,7 +190,8 @@ def checkForStair(diceRoll):
         return False
     return True
 
-def guessIsTrue(guess, result):
+def guessIsTrue(guess):
+    result = checkAllDices()
     if guess[1] == "k":
         for r in result:
             if result[r] >= int(guess[0]):
@@ -163,48 +216,55 @@ def checkAllDices():
                             result[p] += 1
     return result
 
-def playRound(player, lastGuess, lastPlayer):
-    displayPlayers()
 
-    nextPlayerId = nextPlayer(player)
-    if not lastGuess:
-        playerGuess = find_guess()
-        playRound(nextPlayerId, playerGuess, player)
-    elif checkGuess():
-        playerGuess = find_guess()
-        if validGuess(playerGuess, lastGuess):
-            playRound(nextPlayerId, playerGuess, player)
-        else:
-            print("Invalid guess!")
-            root.quit()
-    else:
-        result = checkAllDices()
-        if guessIsTrue(lastGuess, result):
-            print("Result", f"Player {player} lost!")
-        else:
-            print("Result", f"Player {lastPlayer} lost!")
 
-# Initialize the main window
-root = tk.Tk()
-root.title("Thinking Box")    
-root.geometry("800x600+100+50")
+# ----------------------------------------------------------------------------------------------------Helping Function
 
-def displayPlayers():
+
+
+
+
+def displayPlayers(player, lastGuess):
     for widget in player_frame.winfo_children():
         widget.destroy()
     
     for p in playersList:
         tk.Label(player_frame, text=f"Player {p.id}: Dice Amount = {p.diceAmount}, Dice Roll = {p.diceRoll}", font=("Helvetica", 12)).pack(pady=5)
 
-def on_start_game():
-    startGame()
+    
+    global playerTurnLabel, diceResult, lastGuessLabel
 
-# Create and place the button
-button = tk.Button(root, text="Start Game", command=on_start_game, font=("Helvetica", 24))
-button.pack(pady=20)
+    round_result = checkAllDices()
+    if not playerTurnLabel:
+        playerTurnLabel = tk.Label(root, text=round_result)
+        playerTurnLabel.pack()
+    else:
+        playerTurnLabel.text=round_result
+    if not diceResult:
+        diceResult = tk.Label(root, text=f"player {player}'s turn")
+        diceResult.pack()
+    else:
+        playerTurnLabel.text=f"player {player}'s turn"
+    if not lastGuessLabel:
+        lastGuessLabel = tk.Label(root, text="You place the first bet")
+        lastGuessLabel.pack()
+    else:
+        lastGuessLabel.text = f"Last Player Said {lastGuess}"
+
+# ----------------------------------------------------------------------------------------------------Tkinter
+
+
+# Initialize the main window
+root = tk.Tk()
+root.title("Thinking Box")    
+root.geometry("800x600+100+50")
 
 player_frame = tk.Frame(root)
 player_frame.pack(pady=20)
 
+startGame()
+
 # Run the main loop
 root.mainloop()
+
+
