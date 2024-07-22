@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox
 
 startDiceAmount = 4
-playersAmount = 2
+playersAmount = 3
 playersList = []
 lastPlayer = None
 guessAmount = None
@@ -115,7 +115,7 @@ def newRound(loosingPlayer):
         if (loosingPlayer or loosingPlayer == 0) and loosingPlayer != p.id:
             p.diceAmount -= 1
         if p.diceAmount < 1:
-            print(p.id," ER DØD")
+            print(p.id," har vundet")
             continue
         diceRoll = rollDices(p.diceAmount)
         p.diceRoll = diceRoll
@@ -138,7 +138,12 @@ def nextPlayer(player):
 def playRound(player, lastGuess, lastPlayer):
     # Helping function
     displayPlayers(player, lastGuess)
-
+    global playerTurnLabel
+    if not playerTurnLabel:
+        playerTurnLabel = tk.Label(root, text=player)
+        playerTurnLabel.pack()
+    else:
+        playerTurnLabel.text=player
     nextPlayerId = nextPlayer(player)
 
     if not lastGuess:
@@ -250,6 +255,8 @@ def displayPlayers(player, lastGuess):
         lastGuessLabel.pack()
     else:
         lastGuessLabel.text = f"Last Player Said {lastGuess}"
+    print("CHECK DONE")
+
 
 # ----------------------------------------------------------------------------------------------------Tkinter
 
