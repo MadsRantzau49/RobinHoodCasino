@@ -1,9 +1,10 @@
 import random
 import tkinter as tk
 from tkinter import simpledialog, messagebox
+import time
 
 startDiceAmount = 4
-playersAmount = 3
+playersAmount = 2
 playersList = []
 lastPlayer = None
 guessAmount = None
@@ -24,8 +25,12 @@ class PlayerInformation:
         self.diceRoll = diceRoll
 
 def startGame():
-    global playersList
+    global playersList, playerTurnLabel, lastGuessLabel
     playersList = [PlayerInformation(i, startDiceAmount, None) for i in range(playersAmount)]
+    playerTurnLabel = tk.Label(root, text=f"player 0 begin")
+    playerTurnLabel.pack()
+    lastGuessLabel = tk.Label(root, text="You place the first bet")
+    lastGuessLabel.pack()
     generate_guess_layout()
     checkGuessLayout()
     newRound(None)
@@ -110,12 +115,11 @@ def rollDices(d):
 
 
 def newRound(loosingPlayer):
-    print(loosingPlayer)
     for p in playersList:
         if (loosingPlayer or loosingPlayer == 0) and loosingPlayer != p.id:
             p.diceAmount -= 1
         if p.diceAmount < 1:
-            print(p.id," har vundet")
+            p.diceRoll = []
             continue
         diceRoll = rollDices(p.diceAmount)
         p.diceRoll = diceRoll
@@ -132,18 +136,18 @@ def nextPlayer(player):
     for p in playersList:
         if p.diceAmount > 0 and p.id != player:
             return p.id
-    print("HVAD FANDEN FOREGÅR DER")
-    exit()
+    print(f"Player {player} har tabt")
+    tk.Label(root,text=f"Player {player} har tabt").pack()
+    time.sleep(2)
+    startGame()
 
 def playRound(player, lastGuess, lastPlayer):
     # Helping function
     displayPlayers(player, lastGuess)
-    global playerTurnLabel
-    if not playerTurnLabel:
-        playerTurnLabel = tk.Label(root, text=player)
-        playerTurnLabel.pack()
-    else:
-        playerTurnLabel.text=player
+    global playerTurnLabel, lastGuessLabel
+    playerTurnLabel.config(text=f"player {player}'s turn")
+    lastGuessLabel.config(text=f"Last Guess: {lastGuess}")
+
     nextPlayerId = nextPlayer(player)
 
     if not lastGuess:
@@ -155,7 +159,7 @@ def playRound(player, lastGuess, lastPlayer):
             playRound(nextPlayerId, playerGuess, player)
         else:
             print("Invalid guess!")
-            exit()
+            newRound(player)
     else:
         if guessIsTrue(lastGuess):
             newRound(player)
@@ -209,6 +213,8 @@ def guessIsTrue(guess):
 def checkAllDices():
     result = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
     for p in playersList:
+        if p.diceAmount == 0:
+            continue
         if checkForStair(p.diceRoll):
             for d in result:
                 result[d] += len(p.diceRoll) + 1
@@ -226,9 +232,6 @@ def checkAllDices():
 # ----------------------------------------------------------------------------------------------------Helping Function
 
 
-
-
-
 def displayPlayers(player, lastGuess):
     for widget in player_frame.winfo_children():
         widget.destroy()
@@ -236,26 +239,6 @@ def displayPlayers(player, lastGuess):
     for p in playersList:
         tk.Label(player_frame, text=f"Player {p.id}: Dice Amount = {p.diceAmount}, Dice Roll = {p.diceRoll}", font=("Helvetica", 12)).pack(pady=5)
 
-    
-    global playerTurnLabel, diceResult, lastGuessLabel
-
-    round_result = checkAllDices()
-    if not playerTurnLabel:
-        playerTurnLabel = tk.Label(root, text=round_result)
-        playerTurnLabel.pack()
-    else:
-        playerTurnLabel.text=round_result
-    if not diceResult:
-        diceResult = tk.Label(root, text=f"player {player}'s turn")
-        diceResult.pack()
-    else:
-        playerTurnLabel.text=f"player {player}'s turn"
-    if not lastGuessLabel:
-        lastGuessLabel = tk.Label(root, text="You place the first bet")
-        lastGuessLabel.pack()
-    else:
-        lastGuessLabel.text = f"Last Player Said {lastGuess}"
-    print("CHECK DONE")
 
 
 # ----------------------------------------------------------------------------------------------------Tkinter
