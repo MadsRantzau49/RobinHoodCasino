@@ -4,10 +4,28 @@ from collections import defaultdict
 import gym
 from gym import spaces
 import pickle
+import logging
 
 # Constants
 START_DICE_AMOUNT = 4
 PLAYERS_AMOUNT = 2
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Adjust this to INFO or WARNING to reduce verbosity
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("game_bot.log"),
+        # logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger('GameBot')
+
+
+# Plotgraps:
+Næste step er at plot dataen for at se om hvor god AI bliver hvor hurtigt
 
 # ----------------------------------------------------------------------------------------------------Setup
 
@@ -27,10 +45,9 @@ class DanishDiceGameEnv(gym.Env):
         # Observation space: Flattened state representation
         self.observation_space = spaces.Box(low=0, high=7, shape=(2 + 2 * PLAYERS_AMOUNT,), dtype=np.int32)
         
-        self.reset()
+        # self.reset()
 
     def reset(self):
-        # Reset the game state
         self.players = [PlayerInformation(i, START_DICE_AMOUNT) for i in range(PLAYERS_AMOUNT)]
         self.current_player = 0
         self.last_player = None
@@ -38,7 +55,6 @@ class DanishDiceGameEnv(gym.Env):
         self.roll_dice_for_all_players()
         self.state = self.get_state()
         # print(f"Game reset. Starting state: {self.state}")
-        self.print_dice_info()
         return self.state
 
     def roll_dice_for_all_players(self):
@@ -50,17 +66,37 @@ class DanishDiceGameEnv(gym.Env):
     def print_dice_info(self):
         for player in self.players:
             print(f"Player {player.id} dice: {player.dice_roll}")
+            logger.info(f"DICEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE Player {player.id} dice: {player.dice_roll}")
+            pass
 
     def get_state(self):
-        # Flattened state: [current_player, last_guess_amount, last_guess_value, player1_dice_amount, player2_dice_amount, ...]
+        # Initialize the state list with the current player
         state = [self.current_player]
+
+        # Add the last guess information
         if self.last_guess:
             amount, guess_value = self.last_guess
             state.extend([amount, 7 if guess_value == 'k' else int(guess_value)])
         else:
             state.extend([0, 0])
+
+        # Add the number of dice each player has
         state.extend([player.dice_amount for player in self.players])
+
+        current_len = len(state)
+
+        # Add the dice rolls for the current player
+        for player in self.players:
+            if player.id == self.current_player:
+                state.extend(player.dice_roll)
+        
+        #ensure that the length is always equal by adding 0 until its full (maybe stupid)
+        while len(state) != (current_len + START_DICE_AMOUNT):
+            state.extend([0])
+
+        # Convert to NumPy array
         return np.array(state, dtype=np.int32)
+
 
     def next_player(self):
         for player in self.players:
@@ -71,57 +107,74 @@ class DanishDiceGameEnv(gym.Env):
             if player.dice_amount > 0 and player.id != self.current_player:
                 return player.id
             
-        print("NO ACCESSABLE PLAYERS, SOMEONE MUST HAVE ONE, OR ERRORS IN THE CODE XD")
-        exit()
-
     def remove_dice(self,loosingPlayer):
         for player in self.players:
             if player.id != loosingPlayer:
                 player.dice_amount = max(0, player.dice_amount - 1)
-                self.current_player = loosingPlayer
+    
+    def player_lost(self, loosingPlayer):
+        self.remove_dice(loosingPlayer)
+        self.roll_dice_for_all_players()
+        self.current_player = loosingPlayer
+        self.last_player = None
+        self.last_guess = None
 
+    def check_for_max_guess(self, guess):
+        amountOfDices = sum(player.dice_amount + 1 for player in self.players)
+        amount, value = guess
+        return amount == amountOfDices and value == "6"
+    
     def step(self, action):
         done = False
         reward = 0
-        self.print_dice_info()
-        print("STEP IS RUNNING")
-            
         if action == 0:  # Make a guess
-            self.last_guess = self.make_guess()
-            self.last_player = self.current_player
-            self.current_player = self.next_player()
-            # print(f"Player {self.current_player} makes a guess: {self.last_guess}")
+            # ONLY TRAINING
+            lost = False
+            if self.last_guess:
+                if self.guess_is_true(self.last_guess):
+                    reward += -1
+
+                if self.check_for_max_guess(self.last_guess):
+                    lost = True
+                    reward += -10
+                    logger.warning("You lost cause you rolled when your opp tried everybody has the stairs, IDIOT")
+                    self.player_lost(self.current_player)
+                    
+            if not lost:
+                guess = self.make_guess()
+                while not self.validGuess(guess):
+                    guess = self.make_guess()
+                self.last_player = self.current_player
+                self.current_player = self.next_player()
+                self.last_guess = guess
+                logger.info(f"Player {self.current_player} makes a guess: {guess}")
+        
         elif action == 1:  # Call a bluff
             if self.last_guess is None:
-                print("No guess made yet. Cannot call a bluff.")
                 reward = -1  # Penalty for invalid action
-                done = True
+                logger.warning("No guess made yet. Cannot call a bluff.")
+                self.player_lost(self.current_player)
             else:
                 if self.guess_is_true(self.last_guess):
                     reward = 1
-                    print(f"Player {self.current_player} calls bluff correctly.")
-                    # All other players lose a die
-                    self.remove_dice(self.last_player)                   
+                    logger.info(f"Player {self.current_player} calls bluff correctly.")
+                    self.player_lost(self.last_player)          
                 else:
                     reward = -1
-                    print(f"Player {self.current_player} calls bluff incorrectly.")
-                    # The current player loses a die
-                    self.remove_dice(self.current_player)
-                    
-                self.roll_dice_for_all_players()
-                
+                    logger.info(f"Player {self.current_player} calls bluff incorrectly.")
+                    self.player_lost(self.current_player)
+                                    
         self.state = self.get_state()
-        # print(f"New state: {self.state}")
 
         if self.check_game_done():
-            print("GAME IS DONE")
+            logger.info("GAME IS DONE")
             done = True
-            reward = -10  # Higher penalty for losing the game
-
+        
+        logger.debug(f"State: {self.state}, Reward: {reward}")
         return self.state, reward, done, {}
 
     def make_guess(self):
-        amountOfDices = sum(player.dice_amount + 1 for player in self.players) + 1
+        amountOfDices = sum(player.dice_amount + 1 for player in self.players)
         amount = random.randint(1, amountOfDices)
         guess_value = random.choice([str(i) for i in range(1, 7)] + ["k"])
         return [amount, guess_value]
@@ -129,12 +182,36 @@ class DanishDiceGameEnv(gym.Env):
     def guess_is_true(self, guess):
         result = count_all_dices(self.players)
         amount, guess_value = guess
-        print(result)
-        print(f"amount{amount}, guess:{guess_value}")
+        # print(result)
+        # print(f"amount{amount}, guess:{guess_value}")
         if guess_value == "k":
             return result[guess_value] <= amount
         return result[int(guess_value)] <= amount
 
+    def validGuess(self, guess):
+        if not self.last_guess:
+            return True
+        amount, guess_value = guess
+        last_amount, last_guess_value = self.last_guess
+        if amount < last_amount:
+            return False
+        
+        if guess == self.last_guess:
+            return False
+        
+        if amount > last_amount:
+            return True
+        
+        if amount == last_amount:
+            if last_guess_value == "k":
+                return True
+            
+            if guess_value == "k":
+                return False
+            
+            if guess_value < last_guess_value:
+                return False
+        return True
 
     def check_game_done(self):
         # The game is done if only one player has dice left
@@ -211,9 +288,10 @@ def train_agent():
     # Load previously saved Q-table if it exists
     load_q_table(agent, 'q_table.pkl')
 
-    num_episodes = 1000
+    num_episodes = 10000
 
     for episode in range(num_episodes):
+        if episode % 10000 == 0: print(episode)
         state = env.reset()
         done = False
         while not done:
@@ -250,33 +328,51 @@ def play_game():
                     if guess_value not in [str(i) for i in range(1, 7)] + ["k"]:
                         print("Invalid guess value.")
                         continue
-                    env.last_guess = [amount, guess_value]
-                    env.last_player = env.current_player
-                    env.current_player = env.next_player()
+                    if not env.validGuess([amount, guess_value]):
+                        env.player_lost(env.current_player)
+                    else:
+                        env.last_guess = [amount, guess_value]
+                        env.last_player = env.current_player
+                        env.current_player = env.next_player()
                 elif action == 1:
                     if env.guess_is_true(env.last_guess):
-                        env.remove_dice(env.last_player) 
+                        env.player_lost(env.last_player) 
                     else:
-                        env.remove_dice(env.current_player)
-                    env.roll_dice_for_all_players()
+                        env.player_lost(env.current_player)
             else:
                 action = agent.choose_action(state)
-                if action == 0:
-                    env.last_guess = env.make_guess()
-                    print(f"AI makes a guess: {env.last_guess}")
-                    env.last_player = env.current_player
-                    env.current_player = env.next_player()
-                elif action == 1:
+                print(f"AI choooooooooooooooooose to play: {action}")
+                print(f"state = {state}")
+                if action == 0:  # Make a guess
+                    # ONLY TRAINING
+                    lost = False
+                    if env.last_guess:
+                        if env.check_for_max_guess(env.last_guess):
+                            print("You lost cause you rolled when your opp tried everybody has the stairs, IDIOT")
+                            env.player_lost(env.current_player)
+               
+                    if not lost:
+                        guess = env.make_guess()
+                        while not env.validGuess(guess):
+                            guess = env.make_guess()
+                        env.last_player = env.current_player
+                        env.current_player = env.next_player()
+                        env.last_guess = guess
+                        print(f"Player {env.current_player} makes a guess: {guess}")
+                
+                elif action == 1:  # Call a bluff
                     if env.last_guess is None:
-                        print("AI cannot call a bluff as no guess has been made yet.")
+                        print("No guess made yet. Cannot call a bluff.")
+                        env.player_lost(env.current_player)
                     else:
                         if env.guess_is_true(env.last_guess):
-                            env.remove_dice(env.last_player) 
+                            logger.info(f"Player {env.current_player} calls bluff correctly.")
+                            env.player_lost(env.last_player)          
                         else:
-                            env.remove_dice(env.current_player)
-                    env.roll_dice_for_all_players()
+                            logger.info(f"Player {env.current_player} calls bluff incorrectly.")
+                            env.player_lost(env.current_player)
 
-            # state, reward, done, _ = env.step(action)
+            done = env.check_game_done()            
             if done:
                 print("Game over.")
                 break
