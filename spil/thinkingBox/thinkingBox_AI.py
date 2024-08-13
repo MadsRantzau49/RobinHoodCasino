@@ -5,10 +5,16 @@ import gym
 from gym import spaces
 import pickle
 import logging
+import time
+from print_data import *
+
+
 
 # Constants
+NUM_TRAIN_AI = 1000
 START_DICE_AMOUNT = 4
 PLAYERS_AMOUNT = 2
+PLOT_DATA = True
 
 
 # Configure logging
@@ -16,7 +22,7 @@ logging.basicConfig(
     level=logging.DEBUG,  # Adjust this to INFO or WARNING to reduce verbosity
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("game_bot.log"),
+        logging.FileHandler("data/game_bot.log", mode="w"),
         # logging.StreamHandler()
     ]
 )
@@ -25,22 +31,29 @@ logger = logging.getLogger('GameBot')
 
 
 # Plotgraps:
-Næste step er at plot dataen for at se om hvor god AI bliver hvor hurtigt
+max_amount = (START_DICE_AMOUNT + 1) * PLAYERS_AMOUNT
+max_dices = START_DICE_AMOUNT * PLAYERS_AMOUNT
+plot_data = {y: {i: {"k": [0,0,0,0]} | {str(x): [0,0,0,0] for x in range(1, 7)}  for i in range(1, max_amount + 1)}for y in range(2,max_dices+1)}
+
 
 # ----------------------------------------------------------------------------------------------------Setup
 
+map_call = {index + 1: [i + 1, y] for i in range(max_amount) for index, y in enumerate(["k"] + [str(x) for x in range(1, 7)], start=i*7)}
 class PlayerInformation:
     def __init__(self, player_id: int, dice_amount: int):
         self.id = player_id
         self.dice_amount = dice_amount
         self.dice_roll = []
 
-class DanishDiceGameEnv(gym.Env):
+class ThinkingBoxEnv(gym.Env):
     def __init__(self):
-        super(DanishDiceGameEnv, self).__init__()
+        super(ThinkingBoxEnv, self).__init__()
         
-        # Action space: 2 actions (0: Make a guess, 1: Call a bluff)
-        self.action_space = spaces.Discrete(2)
+        # Action space: all the possible calls + 1 (0) for calling bluff
+        max_options = PLAYERS_AMOUNT * (START_DICE_AMOUNT + 1) * 7
+        print(max_options)
+        self.action_space = spaces.Discrete(max_options + 1)
+        logger.warning(self.action_space)
         
         # Observation space: Flattened state representation
         self.observation_space = spaces.Box(low=0, high=7, shape=(2 + 2 * PLAYERS_AMOUNT,), dtype=np.int32)
@@ -65,9 +78,7 @@ class DanishDiceGameEnv(gym.Env):
     
     def print_dice_info(self):
         for player in self.players:
-            print(f"Player {player.id} dice: {player.dice_roll}")
             logger.info(f"DICEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE Player {player.id} dice: {player.dice_roll}")
-            pass
 
     def get_state(self):
         # Initialize the state list with the current player
@@ -124,45 +135,71 @@ class DanishDiceGameEnv(gym.Env):
         amount, value = guess
         return amount == amountOfDices and value == "6"
     
+    def check_without_lifting(self, reward):
+        amount, value = self.last_guess       
+        dice_amount_back = sum(player.dice_amount for player in self.players)
+        if self.guess_is_true(self.last_guess):
+            logger.debug("Correct Roll")
+            reward += 1
+            plot_data[dice_amount_back][amount][value][0] += 1
+        else:
+            logger.warning("Failed Roll")
+            reward -= 1
+            plot_data[dice_amount_back][amount][value][1] += 1
+        return reward
+
     def step(self, action):
+        logger.debug(f"action = {action}")
         done = False
         reward = 0
-        if action == 0:  # Make a guess
-            # ONLY TRAINING
-            lost = False
-            if self.last_guess:
+        if action == 0:  # Lift
+            if not self.last_guess:
+                reward -= 1  # Penalty for invalid action
+                logger.info("No guess made yet. Cannot call a bluff.")
+                self.player_lost(self.current_player)
+            else:
+                amount, value = self.last_guess       
+                dice_amount_back = sum(player.dice_amount for player in self.players)
                 if self.guess_is_true(self.last_guess):
                     reward += -1
+                    plot_data[dice_amount_back][amount][value][3] += 1
+                    logger.info(f"Player {self.current_player} Failed Lift")
+                    self.player_lost(self.current_player)          
+                else:
+                    reward += 1
+                    plot_data[dice_amount_back][amount][value][2] += 1
+                    logger.info(f"Player {self.current_player} Correct Lift")
+                    self.player_lost(self.last_player)
+        
+        else: #Take a guess
+            lost = False
+            if self.last_guess:
+                reward = self.check_without_lifting(reward)
+                logger.debug(self.check_without_lifting(reward))
+
 
                 if self.check_for_max_guess(self.last_guess):
                     lost = True
-                    reward += -10
-                    logger.warning("You lost cause you rolled when your opp tried everybody has the stairs, IDIOT")
+                    reward -= 10
+                    logger.info("You lost cause you rolled when your opp tried everybody has the stairs, IDIOT")
                     self.player_lost(self.current_player)
                     
             if not lost:
-                guess = self.make_guess()
-                while not self.validGuess(guess):
-                    guess = self.make_guess()
+                guess = map_call[action]
+                if not self.validGuess(guess):
+                    reward -= 100
+                else:
+                    reward += 1
+                if self.guess_is_true(guess):
+                    reward += 2
+                else:
+                    reward -= 1
+                
+                    
+                logger.info(f"Player {self.current_player} makes a guess: {guess}")
                 self.last_player = self.current_player
                 self.current_player = self.next_player()
                 self.last_guess = guess
-                logger.info(f"Player {self.current_player} makes a guess: {guess}")
-        
-        elif action == 1:  # Call a bluff
-            if self.last_guess is None:
-                reward = -1  # Penalty for invalid action
-                logger.warning("No guess made yet. Cannot call a bluff.")
-                self.player_lost(self.current_player)
-            else:
-                if self.guess_is_true(self.last_guess):
-                    reward = 1
-                    logger.info(f"Player {self.current_player} calls bluff correctly.")
-                    self.player_lost(self.last_player)          
-                else:
-                    reward = -1
-                    logger.info(f"Player {self.current_player} calls bluff incorrectly.")
-                    self.player_lost(self.current_player)
                                     
         self.state = self.get_state()
 
@@ -170,23 +207,27 @@ class DanishDiceGameEnv(gym.Env):
             logger.info("GAME IS DONE")
             done = True
         
-        logger.debug(f"State: {self.state}, Reward: {reward}")
+        # logger.debug(f"State: {self.state}, Reward: {reward}")
         return self.state, reward, done, {}
 
     def make_guess(self):
         amountOfDices = sum(player.dice_amount + 1 for player in self.players)
-        amount = random.randint(1, amountOfDices)
+
+        # amount = round(random.triangular(1, amountOfDices, 1))
+        amount = random.randint(1,amountOfDices)
         guess_value = random.choice([str(i) for i in range(1, 7)] + ["k"])
         return [amount, guess_value]
 
     def guess_is_true(self, guess):
-        result = count_all_dices(self.players)
+        result = self.count_all_dices(self.players)
         amount, guess_value = guess
-        # print(result)
+        logger.debug(result)
         # print(f"amount{amount}, guess:{guess_value}")
         if guess_value == "k":
-            return result[guess_value] <= amount
-        return result[int(guess_value)] <= amount
+            if amount == 1:
+                logger.warning(f"expression: result[guess_value] <= amount:: {result[guess_value] <= amount}, amount= {amount}, result= {result[guess_value]}")
+            return result[guess_value] >= amount
+        return result[int(guess_value)] >= amount
 
     def validGuess(self, guess):
         if not self.last_guess:
@@ -218,29 +259,29 @@ class DanishDiceGameEnv(gym.Env):
         players_with_dice = sum(1 for player in self.players if player.dice_amount > 0)
         return players_with_dice <= 1
 
-def check_for_straight(dice_roll: list) -> bool:
-    return sorted(dice_roll) == list(range(1, len(dice_roll) + 1))
+    def check_for_straight(self, dice_roll: list) -> bool:
+        return sorted(dice_roll) == list(range(1, len(dice_roll) + 1))
 
-def count_all_dices(players: list) -> dict:
-    result = {i: 0 for i in range(1, 7)}
-    for player in players:
-        if player.dice_amount == 0:
-            continue
-        if check_for_straight(player.dice_roll):
-            for d in result:
-                result[d] += len(player.dice_roll) + 1
-        else:
-            for dice in player.dice_roll:
-                result[dice] += 1
-                if dice == 1:
-                    result = {k: v + 1 for k, v in result.items()}
-                    result[1] -= 1
-    result["k"] = max(result.values())    
-    return result
+    def count_all_dices(self, players: list) -> dict:
+        result = {i: 0 for i in range(1, 7)}
+        for player in players:
+            if player.dice_amount == 0:
+                continue
+            if self.check_for_straight(player.dice_roll):
+                for d in result:
+                    result[d] += len(player.dice_roll) + 1
+            else:
+                for dice in player.dice_roll:
+                    result[dice] += 1
+                    if dice == 1:
+                        result = {k: v + 1 for k, v in result.items()}
+                        result[1] -= 1
+        result["k"] = max(result.values())    
+        return result
 
 # Q-learning Agent
 class QLearningAgent:
-    def __init__(self, state_space, action_space, alpha=0.1, gamma=0.99, epsilon=0.1):
+    def __init__(self, state_space, action_space, alpha=0.1, gamma=0.99, epsilon=0.2):
         self.state_space = state_space
         self.action_space = action_space
         self.alpha = alpha
@@ -282,16 +323,17 @@ def load_q_table(agent, filename):
         print(f"No Q-table file found at {filename}, starting with a new Q-table.")
 
 def train_agent():
-    env = DanishDiceGameEnv()
+    env = ThinkingBoxEnv()
     agent = QLearningAgent(env.observation_space, env.action_space)
 
     # Load previously saved Q-table if it exists
-    load_q_table(agent, 'q_table.pkl')
+    load_q_table(agent, 'data/q_table.pkl')
 
-    num_episodes = 10000
+    num_episodes = NUM_TRAIN_AI
 
     for episode in range(num_episodes):
-        if episode % 10000 == 0: print(episode)
+        start_time = time.time()
+        if episode % 1000 == 0: print(episode)
         state = env.reset()
         done = False
         while not done:
@@ -299,12 +341,15 @@ def train_agent():
             next_state, reward, done, _ = env.step(action)
             agent.learn(state, action, reward, next_state)
             state = next_state
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.debug(f"One game takes {elapsed_time} seconds")
 
     # Save Q-table after training
-    save_q_table(agent, 'q_table.pkl')
+    save_q_table(agent, 'data/q_table.pkl')
 
 def play_game():
-    env = DanishDiceGameEnv()
+    env = ThinkingBoxEnv()
     agent = QLearningAgent(env.observation_space, env.action_space)
 
     # Load the trained Q-table
@@ -342,7 +387,6 @@ def play_game():
             else:
                 action = agent.choose_action(state)
                 print(f"AI choooooooooooooooooose to play: {action}")
-                print(f"state = {state}")
                 if action == 0:  # Make a guess
                     # ONLY TRAINING
                     lost = False
@@ -385,12 +429,29 @@ def main():
 
     if choice == '1':
         print("Training the AI...")
+        start_time = time.time()
         train_agent()
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Execution time: {elapsed_time:.4f} seconds to execute {NUM_TRAIN_AI} games")
+
     elif choice == '2':
         print("Playing against the AI...")
         play_game()
     else:
         print("Invalid choice. Exiting.")
 
+    if PLOT_DATA:
+        logger.debug("Pl")
+        start_time = time.time()
+        data_into_chart(max_dices,plot_data)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Execution time: {elapsed_time:.4f} seconds to plot data")
+
+   
+
 if __name__ == "__main__":
     main()
+
+
