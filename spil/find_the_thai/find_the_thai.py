@@ -14,7 +14,7 @@ def index():
 def find_the_thai():
     numbers_of_thais = 5
     imageLst =[]
-    for image in os.listdir('/home/mads/Documents/RobinHoodCasino/spil/find_the_thai/static/'):
+    for image in os.listdir('C:/Users/madsr/OneDrive/Documents/privat_programmering/RobinHoodCasino/spil/find_the_thai/static/'):
         if image[0] != "1":
             imageLst.append(image)
     random.shuffle(imageLst)

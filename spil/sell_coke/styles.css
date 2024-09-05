@@ -30,3 +30,9 @@
     position: absolute;
     margin:0%;
 }
+
+.controller{
+    position: absolute;
+    left: 60%;
+    top: 20%;
+}

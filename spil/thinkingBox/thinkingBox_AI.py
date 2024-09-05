@@ -11,7 +11,7 @@ from print_data import *
 
 
 # Constants
-NUM_TRAIN_AI = 1000
+NUM_TRAIN_AI = 5
 START_DICE_AMOUNT = 4
 PLAYERS_AMOUNT = 2
 PLOT_DATA = True
@@ -281,7 +281,7 @@ class ThinkingBoxEnv(gym.Env):
 
 # Q-learning Agent
 class QLearningAgent:
-    def __init__(self, state_space, action_space, alpha=0.1, gamma=0.99, epsilon=0.2):
+    def __init__(self, state_space, action_space, alpha=0.1, gamma=0.99, epsilon=0):
         self.state_space = state_space
         self.action_space = action_space
         self.alpha = alpha

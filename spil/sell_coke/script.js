@@ -38,6 +38,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 
+
 function isInsideCanvas(x,y){
     let canvas = document.getElementById("canvas");
     let canvasWidth = canvas.offsetWidth;

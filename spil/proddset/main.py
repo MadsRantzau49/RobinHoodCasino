@@ -45,14 +45,26 @@ def findMatches():
             
         matchesList.append(match_dict)
     return matchesList
-def main(page: ft.page):
 
-    def appendOdds(event, id, bet, odds):
-        print(id,bet,odds)
+
+def main(page: ft.page):
+    page.scroll = "always"
+
+    coupon_lst = ["test"]
+    coupon_display = ft.Text("hej")
+    page.add(coupon_display)
+
+    def display_coupon(event):
+        coupon_display = ft.Text(coupon_lst)
+        page.update()
+
+    def appendOdds(event, match, bet, odds):
+        coupon_lst.append({match, bet, odds})
+        display_coupon(None)
 
     def generateOddsFields(event):
         matches = findMatches()
-        for match in matches:
+        for match in matches[:5]:
             homeTeamLabel = ft.Text(value=f"{match.get("homeTeam")}   - ")
             awayTeamLabel = ft.Text(value=match.get("awayTeam"))
             homeOddsBtn = ft.ElevatedButton(text=match.get('homeOdds'), on_click=lambda e, m=match: appendOdds(e, m['id'], "1", m['homeOdds']))
@@ -70,13 +82,14 @@ def main(page: ft.page):
                 border=ft.border.all(1, "black"), 
                 padding=10,  
                 border_radius=5, 
-                width=page.width * 0.7
+                width=page.width * 0.4
             )
             page.add(matchContainer)
 
-    
-    clickBtn = ft.ElevatedButton(text="click", on_click=generateOddsFields)
-    page.add(clickBtn)
+
+    # clickBtn = ft.ElevatedButton(text="click", on_click=generateOddsFields)
+    # page.add(clickBtn)
+    generateOddsFields(None)
     
 ft.app(target=main)
 
